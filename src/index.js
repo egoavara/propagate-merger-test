@@ -22,3 +22,5 @@ if (require.main === module) {
   console.log(calculateSum(5, 3));
   console.log(greetUser('World'));
 }
+
+function developmentFeature1() { return 'dev feature 1'; }
