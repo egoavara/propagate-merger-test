@@ -1,0 +1,111 @@
+name: Auto Merge Hotfix
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Target version for hotfix (e.g., v0.1.2)'
+        required: true
+        type: string
+      hotfix-suffix:
+        description: 'Hotfix suffix (e.g., hotfix.1)'
+        required: true
+        default: 'hotfix.1'
+        type: string
+      dry-run:
+        description: 'Dry run mode (just check what would be merged)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  auto-merge-hotfix:
+    runs-on: ubuntu-latest
+    
+    outputs:
+      propagation-result: ${{ steps.auto-merge.outputs.propagation-result }}
+      successful-branches: ${{ steps.auto-merge.outputs.successful-branches }}
+      failed-branches: ${{ steps.auto-merge.outputs.failed-branches }}
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Setup test environment
+        run: |
+          echo "Setting up test environment..."
+          git config user.name "Test Bot"
+          git config user.email "test@example.com"
+          
+      - name: Display current repository state
+        run: |
+          echo "Current branches:"
+          git branch -a
+          echo "Current tags:"
+          git tag --list
+          echo "Hotfix branch to merge: ${{ github.event.inputs.version }}-${{ github.event.inputs.hotfix-suffix }}"
+          
+      - name: Check if hotfix branch exists
+        run: |
+          HOTFIX_BRANCH="${{ github.event.inputs.version }}-${{ github.event.inputs.hotfix-suffix }}"
+          if git show-ref --verify --quiet refs/heads/$HOTFIX_BRANCH; then
+            echo "✅ Hotfix branch '$HOTFIX_BRANCH' exists"
+          else
+            echo "❌ Hotfix branch '$HOTFIX_BRANCH' does not exist"
+            echo "Please create the hotfix branch first using the 'Create Hotfix Branch' workflow"
+            exit 1
+          fi
+          
+      - name: Add sample hotfix changes (for testing)
+        run: |
+          HOTFIX_BRANCH="${{ github.event.inputs.version }}-${{ github.event.inputs.hotfix-suffix }}"
+          git checkout $HOTFIX_BRANCH
+          
+          # Add a sample hotfix
+          echo "// Hotfix applied on $(date)" >> src/index.js
+          echo "console.log('Hotfix for ${{ github.event.inputs.version }}');" >> src/index.js
+          
+          if ! git diff --quiet; then
+            git add .
+            git commit -m "Apply hotfix for ${{ github.event.inputs.version }}"
+            echo "✅ Sample hotfix changes committed"
+          else
+            echo "ℹ️  No changes to commit (hotfix already applied)"
+          fi
+          
+          git checkout main
+          
+      - name: Auto Merge Hotfix
+        id: auto-merge
+        uses: egoavara/propagate-merger@v1
+        with:
+          mode: auto-merge
+          version: ${{ github.event.inputs.version }}
+          hotfix-suffix: ${{ github.event.inputs.hotfix-suffix }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          dry-run: ${{ github.event.inputs.dry-run }}
+          
+      - name: Display results
+        run: |
+          echo "🎉 Auto merge completed!"
+          echo "Propagation result: ${{ steps.auto-merge.outputs.propagation-result }}"
+          echo "Successful branches: ${{ steps.auto-merge.outputs.successful-branches }}"
+          echo "Failed branches: ${{ steps.auto-merge.outputs.failed-branches }}"
+          echo ""
+          echo "Final repository state:"
+          git branch -a
+          echo ""
+          echo "Recent commits on main:"
+          git log --oneline -n 10
+          
+      - name: Cleanup (optional)
+        if: github.event.inputs.dry-run == 'false'
+        run: |
+          echo "🧹 Cleanup completed hotfix branch"
+          HOTFIX_BRANCH="${{ github.event.inputs.version }}-${{ github.event.inputs.hotfix-suffix }}"
+          if git show-ref --verify --quiet refs/heads/$HOTFIX_BRANCH; then
+            git branch -d $HOTFIX_BRANCH || git branch -D $HOTFIX_BRANCH
+            echo "✅ Deleted hotfix branch: $HOTFIX_BRANCH"
+          fi

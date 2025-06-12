@@ -1,0 +1,59 @@
+name: Create Hotfix Branch
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Target version for hotfix (e.g., v0.1.2)'
+        required: true
+        type: string
+      hotfix-suffix:
+        description: 'Hotfix suffix (e.g., hotfix.1)'
+        required: true
+        default: 'hotfix.1'
+        type: string
+
+jobs:
+  create-hotfix-branch:
+    runs-on: ubuntu-latest
+    
+    outputs:
+      hotfix-branch: ${{ steps.create-hotfix.outputs.hotfix-branch }}
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Setup test environment
+        run: |
+          echo "Setting up test environment..."
+          git config user.name "Test Bot"
+          git config user.email "test@example.com"
+          
+      - name: Display current repository state
+        run: |
+          echo "Current branches:"
+          git branch -a
+          echo "Current tags:"
+          git tag --list
+          echo "Current commit:"
+          git log --oneline -n 5
+          
+      - name: Create Hotfix Branch
+        id: create-hotfix
+        uses: egoavara/propagate-merger@v1
+        with:
+          mode: branch-create
+          version: ${{ github.event.inputs.version }}
+          hotfix-suffix: ${{ github.event.inputs.hotfix-suffix }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Display results
+        run: |
+          echo "Hotfix branch created successfully!"
+          echo "Branch name: ${{ steps.create-hotfix.outputs.hotfix-branch }}"
+          echo "Final repository state:"
+          git branch -a
+          git tag --list
