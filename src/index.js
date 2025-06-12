@@ -26,3 +26,4 @@ if (require.main === module) {
 function developmentFeature1() { return 'dev feature 1'; }
 function developmentFeature2() { return 'dev feature 2'; }
 function developmentFeature3() { return 'dev feature 3'; }
+function developmentFeature4() { return 'dev feature 4'; }
