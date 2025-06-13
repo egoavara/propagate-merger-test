@@ -67,7 +67,7 @@ jobs:
           mode: branch-create
           version: ${{ github.event.inputs.version }}
           hotfix-suffix: ${{ github.event.inputs.hotfix-suffix }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ github.token }}
           
       - name: Display results
         run: |

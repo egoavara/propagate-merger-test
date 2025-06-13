@@ -120,7 +120,7 @@ jobs:
           mode: auto-merge
           version: ${{ github.event.inputs.version }}
           hotfix-suffix: ${{ github.event.inputs.hotfix-suffix }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ github.token }}
           dry-run: ${{ github.event.inputs.dry-run }}
           
       - name: Display results
