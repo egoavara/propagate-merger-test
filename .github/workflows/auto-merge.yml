@@ -19,6 +19,11 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: write
+  actions: read
+  pull-requests: write
+
 jobs:
   auto-merge-hotfix:
     runs-on: ubuntu-latest
