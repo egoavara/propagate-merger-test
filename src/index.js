@@ -17,10 +17,20 @@ if (typeof module !== 'undefined' && module.exports) {
   };
 }
 
+// New v0.3.0 features
+function calculateProduct(a, b) {
+  return a * b;
+}
+
+function formatOutput(value, label) {
+  return `${label}: ${value}`;
+}
+
 // Run if this is the main file
 if (require.main === module) {
   console.log(calculateSum(5, 3));
   console.log(greetUser('World'));
+  console.log(formatOutput(calculateProduct(4, 6), 'Product'));
 }
 
 function developmentFeature1() { return 'dev feature 1'; }
