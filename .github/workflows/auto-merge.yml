@@ -7,7 +7,7 @@ on:
         description: 'Target version for hotfix (e.g., v0.1.0)'
         required: true
         type: string
-        default: 'v0.1.0'
+        default: 'v0.1.0
       hotfix-suffix:
         description: 'Hotfix suffix (e.g., hotfix.1)'
         required: true
