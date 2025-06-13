@@ -23,6 +23,10 @@ function calculateProduct(a, b) {
 }
 
 function formatOutput(value, label) {
+  // HOTFIX: Add null/undefined safety check
+  if (value === null || value === undefined) {
+    return `${label}: N/A`;
+  }
   return `${label}: ${value}`;
 }
 
