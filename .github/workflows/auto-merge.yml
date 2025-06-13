@@ -22,10 +22,7 @@ on:
 jobs:
   auto-merge-hotfix:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: read
-      pull-requests: write
+    permissions: write-all
     
     outputs:
       propagation-result: ${{ steps.auto-merge.outputs.propagation-result }}

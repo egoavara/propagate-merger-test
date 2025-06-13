@@ -17,10 +17,7 @@ on:
 jobs:
   create-hotfix-branch:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: read
-      pull-requests: write
+    permissions: write-all
     
     outputs:
       hotfix-branch: ${{ steps.create-hotfix.outputs.hotfix-branch }}
