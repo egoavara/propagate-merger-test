@@ -14,14 +14,13 @@ on:
         default: 'hotfix.1'
         type: string
 
-permissions:
-  contents: write
-  actions: read
-  pull-requests: write
-
 jobs:
   create-hotfix-branch:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
     
     outputs:
       hotfix-branch: ${{ steps.create-hotfix.outputs.hotfix-branch }}
@@ -31,6 +30,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Setup test environment
         run: |

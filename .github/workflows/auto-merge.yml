@@ -19,14 +19,13 @@ on:
         default: false
         type: boolean
 
-permissions:
-  contents: write
-  actions: read
-  pull-requests: write
-
 jobs:
   auto-merge-hotfix:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
     
     outputs:
       propagation-result: ${{ steps.auto-merge.outputs.propagation-result }}
@@ -38,6 +37,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Setup test environment
         run: |
