@@ -72,12 +72,21 @@ jobs:
           echo "Branch name: ${{ steps.create-hotfix.outputs.hotfix-branch }}"
           echo ""
           echo "📊 Final repository state:"
+          
+          # Fetch the newly created branch
+          git fetch origin
+          
           echo "Branches:"
           git branch -a
           echo ""
-          echo "Recent commits on hotfix branch:"
-          git checkout ${{ steps.create-hotfix.outputs.hotfix-branch }}
-          git log --oneline -n 5
+          
+          if [ -n "${{ steps.create-hotfix.outputs.hotfix-branch }}" ]; then
+            echo "Recent commits on hotfix branch:"
+            git checkout ${{ steps.create-hotfix.outputs.hotfix-branch }}
+            git log --oneline -n 5
+          else
+            echo "⚠️ Hotfix branch name not available in outputs"
+          fi
           
       - name: Next steps
         run: |
