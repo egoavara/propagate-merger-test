@@ -80,7 +80,7 @@ Critical security fix:
       - name: Test propagate-merger auto-merge
         id: auto-merge
         continue-on-error: true
-        uses: egoavara/propagate-merger@v0.0.1
+        uses: egoavara/propagate-merger@v0.0.2
         with:
           mode: auto-merge
           version: ${{ github.event.inputs.version }}

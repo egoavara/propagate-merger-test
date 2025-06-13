@@ -103,7 +103,7 @@ jobs:
           
       - name: Test propagate-merger action with debug
         continue-on-error: true
-        uses: egoavara/propagate-merger@v0.0.1
+        uses: egoavara/propagate-merger@v0.0.2
         env:
           ACTIONS_STEP_DEBUG: true
         with:
