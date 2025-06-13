@@ -57,7 +57,7 @@ jobs:
           
       - name: Create Hotfix Branch
         id: create-hotfix
-        uses: egoavara/propagate-merger@v1
+        uses: egoavara/propagate-merger@v0.0.1
         with:
           mode: branch-create
           version: ${{ github.event.inputs.version }}

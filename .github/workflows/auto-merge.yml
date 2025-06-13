@@ -110,7 +110,7 @@ jobs:
           
       - name: Auto Merge Hotfix
         id: auto-merge
-        uses: egoavara/propagate-merger@v1
+        uses: egoavara/propagate-merger@v0.0.1
         with:
           mode: auto-merge
           version: ${{ github.event.inputs.version }}
