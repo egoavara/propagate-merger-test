@@ -30,6 +30,18 @@ function formatOutput(value, label) {
   return `${label}: ${value}`;
 }
 
+// v0.3.1 additional features
+function validateInput(value) {
+  return typeof value === 'number' && !isNaN(value);
+}
+
+function safeCalculate(a, b, operation) {
+  if (!validateInput(a) || !validateInput(b)) {
+    return 'Invalid input';
+  }
+  return operation(a, b);
+}
+
 // Run if this is the main file
 if (require.main === module) {
   console.log(calculateSum(5, 3));
