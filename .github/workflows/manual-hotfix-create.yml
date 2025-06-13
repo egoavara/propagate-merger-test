@@ -1,0 +1,120 @@
+name: Manual Hotfix Create (Working Solution)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Target version for hotfix (e.g., v0.1.0)'
+        required: true
+        type: string
+        default: 'v0.1.0'
+      hotfix-suffix:
+        description: 'Hotfix suffix (e.g., hotfix.1)'
+        required: true
+        default: 'hotfix.1'
+        type: string
+
+permissions: write-all
+
+jobs:
+  create-hotfix:
+    runs-on: ubuntu-latest
+    
+    outputs:
+      hotfix-branch: ${{ steps.create.outputs.hotfix-branch }}
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT || github.token }}
+          
+      - name: Setup environment
+        run: |
+          git config user.name "Test Bot"
+          git config user.email "test@example.com"
+          
+      - name: Create hotfix branch (working method)
+        id: create
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          SUFFIX="${{ github.event.inputs.hotfix-suffix }}"
+          CLEAN_VERSION="${VERSION#v}"
+          TAG_NAME="v${CLEAN_VERSION}"
+          HOTFIX_BRANCH="hotfix/v${CLEAN_VERSION}-${SUFFIX}"
+          
+          echo "🚀 Creating hotfix branch: $HOTFIX_BRANCH"
+          echo "📍 From tag: $TAG_NAME"
+          
+          # Verify tag exists
+          if ! git tag --list | grep -q "^${TAG_NAME}$"; then
+            echo "❌ Tag ${TAG_NAME} not found"
+            echo "Available tags:"
+            git tag --list
+            exit 1
+          fi
+          
+          # Get tag SHA using the working method
+          TAG_SHA=$(curl -s -H "Authorization: token ${{ secrets.GH_PAT || github.token }}" \
+                         -H "Accept: application/vnd.github.v3+json" \
+                         "https://api.github.com/repos/${{ github.repository }}/git/refs/tags/${TAG_NAME}" \
+                         | jq -r '.object.sha')
+          
+          echo "✅ Tag SHA: $TAG_SHA"
+          
+          # Delete branch if exists
+          git push origin --delete "$HOTFIX_BRANCH" 2>/dev/null || true
+          
+          # Create branch using working API method
+          RESULT=$(curl -s -X POST \
+               -H "Authorization: token ${{ secrets.GH_PAT || github.token }}" \
+               -H "Accept: application/vnd.github.v3+json" \
+               -H "Content-Type: application/json" \
+               "https://api.github.com/repos/${{ github.repository }}/git/refs" \
+               -d "{
+                 \"ref\": \"refs/heads/${HOTFIX_BRANCH}\",
+                 \"sha\": \"${TAG_SHA}\"
+               }")
+          
+          # Check result
+          if echo "$RESULT" | jq -e '.ref' > /dev/null; then
+            echo "✅ Hotfix branch created successfully!"
+            echo "Branch: $HOTFIX_BRANCH"
+            echo "hotfix-branch=$HOTFIX_BRANCH" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Failed to create branch"
+            echo "$RESULT" | jq '.'
+            exit 1
+          fi
+          
+      - name: Verify branch creation
+        run: |
+          HOTFIX_BRANCH="${{ steps.create.outputs.hotfix-branch }}"
+          echo "🔍 Verifying branch creation..."
+          
+          # Check if branch exists
+          if git ls-remote --heads origin "$HOTFIX_BRANCH" | grep -q "$HOTFIX_BRANCH"; then
+            echo "✅ Branch verified on remote: $HOTFIX_BRANCH"
+          else
+            echo "❌ Branch not found on remote"
+            exit 1
+          fi
+          
+          # Checkout and show info
+          git fetch origin
+          git checkout "$HOTFIX_BRANCH"
+          echo "📋 Branch info:"
+          echo "Current branch: $(git branch --show-current)"
+          echo "Latest commit: $(git log --oneline -n 1)"
+          
+      - name: Summary
+        run: |
+          echo "🎉 Hotfix branch creation completed!"
+          echo "✅ Branch: ${{ steps.create.outputs.hotfix-branch }}"
+          echo "✅ Based on: ${{ github.event.inputs.version }}"
+          echo ""
+          echo "🚀 Next steps:"
+          echo "1. Make your hotfix changes on this branch"
+          echo "2. Commit your changes" 
+          echo "3. Test auto-merge functionality"

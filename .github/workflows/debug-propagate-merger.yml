@@ -1,0 +1,113 @@
+name: Debug Propagate Merger
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Target version for hotfix (e.g., v0.1.0)'
+        required: true
+        type: string
+        default: 'v0.1.0'
+
+permissions: write-all
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT || github.token }}
+          
+      - name: Setup environment
+        run: |
+          git config user.name "Test Bot"
+          git config user.email "test@example.com"
+          
+      - name: Check tag exists exactly like propagate-merger does
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          CLEAN_VERSION="${VERSION#v}"
+          TAG_NAME="v${CLEAN_VERSION}"
+          
+          echo "🔍 Input version: $VERSION"
+          echo "🔍 Clean version: $CLEAN_VERSION" 
+          echo "🔍 Tag name: $TAG_NAME"
+          echo ""
+          echo "Available tags:"
+          git tag --list
+          echo ""
+          
+          # Test the exact API call propagate-merger uses
+          echo "🔍 Testing git.getRef for tags/${TAG_NAME}..."
+          curl -H "Authorization: token ${{ secrets.GH_PAT || github.token }}" \
+               -H "Accept: application/vnd.github.v3+json" \
+               "https://api.github.com/repos/${{ github.repository }}/git/refs/tags/${TAG_NAME}" \
+               | jq '.'
+               
+      - name: Test exact branch creation like propagate-merger
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          CLEAN_VERSION="${VERSION#v}"
+          TAG_NAME="v${CLEAN_VERSION}"
+          HOTFIX_BRANCH="hotfix/v${CLEAN_VERSION}-hotfix.1"
+          
+          echo "🌿 Creating branch exactly like propagate-merger: $HOTFIX_BRANCH"
+          echo "📍 From tag: $TAG_NAME"
+          
+          # Get tag SHA exactly like propagate-merger
+          TAG_SHA=$(curl -s -H "Authorization: token ${{ secrets.GH_PAT || github.token }}" \
+                         -H "Accept: application/vnd.github.v3+json" \
+                         "https://api.github.com/repos/${{ github.repository }}/git/refs/tags/${TAG_NAME}" \
+                         | jq -r '.object.sha')
+          
+          echo "Tag SHA: $TAG_SHA"
+          
+          if [ "$TAG_SHA" = "null" ] || [ -z "$TAG_SHA" ]; then
+            echo "❌ Failed to get tag SHA"
+            exit 1
+          fi
+          
+          # Delete if exists
+          curl -X DELETE \
+               -H "Authorization: token ${{ secrets.GH_PAT || github.token }}" \
+               -H "Accept: application/vnd.github.v3+json" \
+               "https://api.github.com/repos/${{ github.repository }}/git/refs/heads/${HOTFIX_BRANCH}" 2>/dev/null || true
+          
+          # Create branch exactly like propagate-merger
+          echo "🌿 Creating refs/heads/${HOTFIX_BRANCH} with SHA ${TAG_SHA}"
+          RESULT=$(curl -s -X POST \
+               -H "Authorization: token ${{ secrets.GH_PAT || github.token }}" \
+               -H "Accept: application/vnd.github.v3+json" \
+               -H "Content-Type: application/json" \
+               "https://api.github.com/repos/${{ github.repository }}/git/refs" \
+               -d "{
+                 \"ref\": \"refs/heads/${HOTFIX_BRANCH}\",
+                 \"sha\": \"${TAG_SHA}\"
+               }")
+          
+          echo "API Response:"
+          echo "$RESULT" | jq '.'
+          
+          # Check if it worked
+          if echo "$RESULT" | jq -e '.ref' > /dev/null; then
+            echo "✅ Branch created successfully!"
+          else
+            echo "❌ Branch creation failed"
+            echo "Error details:"
+            echo "$RESULT" | jq -r '.message // .error // "Unknown error"'
+          fi
+          
+      - name: Test propagate-merger action with debug
+        continue-on-error: true
+        uses: egoavara/propagate-merger@v0.0.2
+        env:
+          ACTIONS_STEP_DEBUG: true
+        with:
+          mode: branch-create
+          version: ${{ github.event.inputs.version }}
+          hotfix-suffix: hotfix.1
+          github-token: ${{ secrets.GH_PAT || github.token }}

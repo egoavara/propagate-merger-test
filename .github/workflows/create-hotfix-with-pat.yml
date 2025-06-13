@@ -1,4 +1,4 @@
-name: Create Hotfix Branch
+name: Create Hotfix Branch (with PAT)
 
 on:
   workflow_dispatch:
@@ -27,13 +27,22 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_PAT || github.token }}
           
       - name: Setup test environment
         run: |
           echo "🛠️ Setting up test environment..."
           git config user.name "Test Bot"
           git config user.email "test@example.com"
+          
+      - name: Check token availability
+        run: |
+          if [ -n "${{ secrets.GH_PAT }}" ]; then
+            echo "✅ Using Personal Access Token (GH_PAT)"
+          else
+            echo "⚠️ Using default GITHUB_TOKEN (may have limited permissions)"
+            echo "💡 Consider setting up GH_PAT secret for full functionality"
+          fi
           
       - name: Display current repository state
         run: |
@@ -59,7 +68,7 @@ jobs:
           
       - name: Create Hotfix Branch
         id: create-hotfix
-        uses: egoavara/propagate-merger@v0.0.2
+        uses: egoavara/propagate-merger@v0.0.1
         with:
           mode: branch-create
           version: ${{ github.event.inputs.version }}
@@ -72,21 +81,12 @@ jobs:
           echo "Branch name: ${{ steps.create-hotfix.outputs.hotfix-branch }}"
           echo ""
           echo "📊 Final repository state:"
-          
-          # Fetch the newly created branch
-          git fetch origin
-          
           echo "Branches:"
           git branch -a
           echo ""
-          
-          if [ -n "${{ steps.create-hotfix.outputs.hotfix-branch }}" ]; then
-            echo "Recent commits on hotfix branch:"
-            git checkout ${{ steps.create-hotfix.outputs.hotfix-branch }}
-            git log --oneline -n 5
-          else
-            echo "⚠️ Hotfix branch name not available in outputs"
-          fi
+          echo "Recent commits on hotfix branch:"
+          git checkout ${{ steps.create-hotfix.outputs.hotfix-branch }}
+          git log --oneline -n 5
           
       - name: Next steps
         run: |
