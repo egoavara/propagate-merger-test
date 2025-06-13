@@ -1,0 +1,168 @@
+name: Manual Hotfix Test (Workaround)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Target version for hotfix (e.g., v0.1.0)'
+        required: true
+        type: string
+        default: 'v0.1.0'
+      hotfix-suffix:
+        description: 'Hotfix suffix (e.g., hotfix.1)'
+        required: true
+        default: 'hotfix.1'
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+  pull-requests: write
+
+jobs:
+  manual-hotfix-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Setup environment
+        run: |
+          echo "🛠️ Setting up test environment..."
+          git config user.name "Test Bot"
+          git config user.email "test@example.com"
+          
+      - name: Display current state
+        run: |
+          echo "📋 Current repository state:"
+          echo "Branches:"
+          git branch -a
+          echo ""
+          echo "Tags:"
+          git tag --list
+          echo ""
+          echo "Target version: ${{ github.event.inputs.version }}"
+          echo "Hotfix suffix: ${{ github.event.inputs.hotfix-suffix }}"
+          
+      - name: Verify target version exists
+        run: |
+          if ! git tag --list | grep -q "^${{ github.event.inputs.version }}$"; then
+            echo "❌ Error: Tag '${{ github.event.inputs.version }}' does not exist"
+            echo "Available tags:"
+            git tag --list
+            exit 1
+          fi
+          echo "✅ Target version '${{ github.event.inputs.version }}' found"
+          
+      - name: Create hotfix branch manually
+        run: |
+          HOTFIX_BRANCH="hotfix/${{ github.event.inputs.version }}-${{ github.event.inputs.hotfix-suffix }}"
+          
+          echo "🌿 Creating hotfix branch: $HOTFIX_BRANCH"
+          echo "📍 From tag: ${{ github.event.inputs.version }}"
+          
+          # Check if branch already exists
+          if git show-ref --verify --quiet refs/heads/$HOTFIX_BRANCH; then
+            echo "⚠️ Branch $HOTFIX_BRANCH already exists locally"
+            git branch -D $HOTFIX_BRANCH
+          fi
+          
+          if git show-ref --verify --quiet refs/remotes/origin/$HOTFIX_BRANCH; then
+            echo "⚠️ Branch $HOTFIX_BRANCH already exists on remote"
+            git push origin --delete $HOTFIX_BRANCH
+          fi
+          
+          # Create branch from tag
+          git checkout -b $HOTFIX_BRANCH ${{ github.event.inputs.version }}
+          
+          echo "✅ Created hotfix branch: $HOTFIX_BRANCH"
+          
+      - name: Add sample hotfix changes
+        run: |
+          HOTFIX_BRANCH="hotfix/${{ github.event.inputs.version }}-${{ github.event.inputs.hotfix-suffix }}"
+          
+          echo "🔧 Adding sample hotfix changes..."
+          
+          # Add hotfix changes to simulate a real fix
+          echo "" >> src/index.js
+          echo "// Hotfix applied on $(date)" >> src/index.js
+          echo "function hotfixFor${{ github.event.inputs.version }}() {" >> src/index.js
+          echo "  console.log('Critical hotfix for ${{ github.event.inputs.version }} applied');" >> src/index.js
+          echo "  return 'hotfix-${{ github.event.inputs.hotfix-suffix }}';" >> src/index.js
+          echo "}" >> src/index.js
+          
+          # Commit changes
+          git add .
+          git commit -m "Apply critical hotfix for ${{ github.event.inputs.version }}
+
+- Fix critical security vulnerability
+- Add hotfix validation function  
+- Tested and ready for propagation to other branches"
+          
+          # Push hotfix branch
+          git push origin $HOTFIX_BRANCH
+          
+          echo "✅ Hotfix changes committed and pushed"
+          
+      - name: Show hotfix details
+        run: |
+          HOTFIX_BRANCH="hotfix/${{ github.event.inputs.version }}-${{ github.event.inputs.hotfix-suffix }}"
+          
+          echo "📝 Hotfix branch details:"
+          echo "Branch: $HOTFIX_BRANCH"
+          echo "Based on: ${{ github.event.inputs.version }}"
+          echo ""
+          echo "Recent commits:"
+          git log --oneline -n 3
+          echo ""
+          echo "Files changed:"
+          git diff HEAD~1 --name-only
+          
+      - name: Test propagate-merger auto-merge
+        id: auto-merge
+        continue-on-error: true
+        uses: egoavara/propagate-merger@v0.0.1
+        with:
+          mode: auto-merge
+          version: ${{ github.event.inputs.version }}
+          hotfix-suffix: ${{ github.event.inputs.hotfix-suffix }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Display propagation results
+        run: |
+          echo "🎉 Propagation test completed!"
+          echo ""
+          if [ "${{ steps.auto-merge.outcome }}" = "success" ]; then
+            echo "✅ Auto-merge succeeded!"
+            echo "Propagation result: ${{ steps.auto-merge.outputs.propagation-result }}"
+            echo "Successful branches: ${{ steps.auto-merge.outputs.successful-branches }}"
+            echo "Failed branches: ${{ steps.auto-merge.outputs.failed-branches }}"
+          else
+            echo "❌ Auto-merge failed, but hotfix branch was created successfully"
+            echo "You can manually merge the hotfix branch to other branches"
+          fi
+          
+      - name: Show final repository state
+        run: |
+          echo "📊 Final repository state:"
+          echo "All branches:"
+          git branch -a
+          echo ""
+          echo "Recent commits on main:"
+          git checkout main 2>/dev/null || true
+          git log --oneline -n 5
+          
+      - name: Next steps
+        run: |
+          HOTFIX_BRANCH="hotfix/${{ github.event.inputs.version }}-${{ github.event.inputs.hotfix-suffix }}"
+          echo "🚀 Next steps:"
+          echo "1. ✅ Hotfix branch created: $HOTFIX_BRANCH"
+          echo "2. ✅ Sample changes committed"
+          echo "3. 🔄 Test auto-merge (may need PAT token for full functionality)"
+          echo ""
+          echo "Manual merge commands if needed:"
+          echo "git checkout main && git merge $HOTFIX_BRANCH"
+          echo "git checkout dev && git merge $HOTFIX_BRANCH"
