@@ -1,0 +1,120 @@
+name: Auto Propagate Hotfix on PR Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions: write-all
+
+jobs:
+  auto-propagate:
+    runs-on: ubuntu-latest
+    # Only run when PR is merged (not just closed)
+    if: github.event.pull_request.merged == true
+    
+    steps:
+      - name: Check if hotfix branch
+        id: check-hotfix
+        run: |
+          PR_BRANCH="${{ github.event.pull_request.head.ref }}"
+          echo "PR branch: $PR_BRANCH"
+          
+          if [[ "$PR_BRANCH" =~ ^hotfix/v[0-9]+\.[0-9]+\.[0-9]+-hotfix\.[0-9]+$ ]]; then
+            echo "✅ This is a hotfix branch: $PR_BRANCH"
+            echo "is-hotfix=true" >> $GITHUB_OUTPUT
+            
+            # Extract version and suffix
+            VERSION=$(echo "$PR_BRANCH" | sed -E 's/hotfix\/(v[0-9]+\.[0-9]+\.[0-9]+)-hotfix\.[0-9]+/\1/')
+            SUFFIX=$(echo "$PR_BRANCH" | sed -E 's/hotfix\/v[0-9]+\.[0-9]+\.[0-9]+-(hotfix\.[0-9]+)/\1/')
+            
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "hotfix-suffix=$SUFFIX" >> $GITHUB_OUTPUT
+            echo "hotfix-branch=$PR_BRANCH" >> $GITHUB_OUTPUT
+          else
+            echo "ℹ️ Not a hotfix branch, skipping auto-propagation"
+            echo "is-hotfix=false" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Checkout repository
+        if: steps.check-hotfix.outputs.is-hotfix == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT || github.token }}
+          
+      - name: Setup environment
+        if: steps.check-hotfix.outputs.is-hotfix == 'true'
+        run: |
+          git config user.name "Hotfix Auto-Propagation Bot"
+          git config user.email "actions@github.com"
+          
+      - name: Display propagation info
+        if: steps.check-hotfix.outputs.is-hotfix == 'true'
+        run: |
+          echo "🚀 Auto-propagating hotfix after PR merge"
+          echo "📋 Hotfix Details:"
+          echo "  - PR: #${{ github.event.pull_request.number }}"
+          echo "  - Branch: ${{ steps.check-hotfix.outputs.hotfix-branch }}"
+          echo "  - Version: ${{ steps.check-hotfix.outputs.version }}"
+          echo "  - Suffix: ${{ steps.check-hotfix.outputs.hotfix-suffix }}"
+          echo "  - Target branches: dev, release/* (higher versions)"
+          echo ""
+          
+      - name: Auto propagate hotfix
+        if: steps.check-hotfix.outputs.is-hotfix == 'true'
+        id: auto-merge
+        uses: egoavara/propagate-merger@v0.0.2
+        with:
+          mode: auto-merge
+          version: ${{ steps.check-hotfix.outputs.version }}
+          hotfix-suffix: ${{ steps.check-hotfix.outputs.hotfix-suffix }}
+          github-token: ${{ secrets.GH_PAT || github.token }}
+          
+      - name: Display propagation results
+        if: steps.check-hotfix.outputs.is-hotfix == 'true'
+        run: |
+          echo "🎉 Hotfix auto-propagation completed!"
+          echo ""
+          echo "📊 Results:"
+          echo "Propagation result: ${{ steps.auto-merge.outputs.propagation-result }}"
+          echo "Successful branches: ${{ steps.auto-merge.outputs.successful-branches }}"
+          echo "Failed branches: ${{ steps.auto-merge.outputs.failed-branches }}"
+          echo "Created PRs: ${{ steps.auto-merge.outputs.created-prs }}"
+          echo ""
+          echo "✅ Hotfix has been automatically propagated to other branches"
+          
+      - name: Comment on PR with results
+        if: steps.check-hotfix.outputs.is-hotfix == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_PAT || github.token }}
+          script: |
+            const result = '${{ steps.auto-merge.outputs.propagation-result }}';
+            const successful = '${{ steps.auto-merge.outputs.successful-branches }}';
+            const failed = '${{ steps.auto-merge.outputs.failed-branches }}';
+            const prs = '${{ steps.auto-merge.outputs.created-prs }}';
+            
+            let comment = `## 🚀 Hotfix Auto-Propagation Results\n\n`;
+            comment += `**Status**: ${result === 'success' ? '✅ Success' : result === 'partial' ? '⚠️ Partial' : '❌ Failed'}\n\n`;
+            
+            if (successful) {
+              comment += `**✅ Successfully propagated to**: ${successful}\n\n`;
+            }
+            
+            if (failed) {
+              comment += `**❌ Failed to propagate to**: ${failed}\n\n`;
+            }
+            
+            if (prs) {
+              comment += `**📋 Created PRs**: ${prs}\n\n`;
+            }
+            
+            comment += `This hotfix has been automatically propagated to other branches according to semantic versioning rules.`;
+            
+            github.rest.issues.createComment({
+              issue_number: ${{ github.event.pull_request.number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
